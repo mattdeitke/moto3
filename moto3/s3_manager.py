@@ -48,11 +48,8 @@ class S3Manager:
         return obj.get()["Body"].read().decode("utf-8")
 
     def exists(self, key: str) -> bool:
-        try:
-            s3_resource.meta.client.head_object(Bucket=self.bucket_name, Key=key)
-            return True
-        except s3_client.exceptions.NoSuchKey:
-            return False
+        results = s3_client.list_objects(Bucket=self.bucket_name, Prefix=key)
+        return "Contents" in results
 
     def list_all_files(bucket_name: str) -> list:
         bucket = s3_resource.Bucket(bucket_name)
