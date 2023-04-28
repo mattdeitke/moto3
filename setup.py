@@ -10,6 +10,6 @@ setup(
     ],
     author="Matt Deitke",
     author_email="mattd@allenai.org",
-    description="A custom wrapper around AWS boto3.",
+    description="An internal custom wrapper around AWS boto3.",
     url="https://github.com/mattdeitke/moto3",
 )
