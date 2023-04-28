@@ -63,7 +63,10 @@ class QueueManager:
     def get_next(self, max_messages: int = 1) -> list:
         response = self.queue.receive_messages(MaxNumberOfMessages=max_messages)
         message = response["Messages"][0]
-        item = json.loads(message.body)
+        if message.body.startswith("{"):
+            item = json.loads(message.body)
+        else:
+            item = message.body
         return message, item
 
     def delete(self, message) -> None:
