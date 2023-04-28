@@ -38,7 +38,8 @@ class QueueManager:
 
     @staticmethod
     def _upload_batch(x) -> None:
-        sqs, batch, queue_url = x
+        sqs = boto3.client("sqs")
+        batch, queue_url = x
         sqs.send_message_batch(QueueUrl=queue_url, Entries=batch)
 
     def upload(self, messages: list) -> None:
@@ -53,7 +54,7 @@ class QueueManager:
         ]
         batch_size = 10
         batches = [
-            (self.sqs, messages[i : i + batch_size], self.queue_url)
+            (messages[i : i + batch_size], self.queue_url)
             for i in range(0, len(messages), batch_size)
         ]
         # use tqdm and multiprocessing to upload the batches
