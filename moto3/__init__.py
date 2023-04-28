@@ -15,6 +15,12 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 
+def _upload_batch(x) -> None:
+    sqs = boto3.client("sqs")
+    batch, queue_url = x
+    sqs.send_message_batch(QueueUrl=queue_url, Entries=batch)
+
+
 class QueueManager:
     def __init__(self, queue_name: str) -> None:
         self.sqs = boto3.resource("sqs")
@@ -36,12 +42,6 @@ class QueueManager:
     def size(self) -> int:
         return self.queue.attributes["ApproximateNumberOfMessages"]
 
-    @staticmethod
-    def _upload_batch(x) -> None:
-        sqs = boto3.client("sqs")
-        batch, queue_url = x
-        sqs.send_message_batch(QueueUrl=queue_url, Entries=batch)
-
     def upload(self, messages: list) -> None:
         messages = [
             {
@@ -59,11 +59,11 @@ class QueueManager:
         ]
         # use tqdm and multiprocessing to upload the batches
         with Pool(multiprocessing.cpu_count()) as p:
-            list(tqdm(p.imap(self._upload_batch, batches), total=len(batches)))
+            list(tqdm(p.imap(_upload_batch, batches), total=len(batches)))
 
     def get_next(self, max_messages: int = 1) -> list:
         response = self.queue.receive_messages(MaxNumberOfMessages=max_messages)
-        message = response["Messages"][0]
+        message = response[0]
         if message.body.startswith("{"):
             item = json.loads(message.body)
         else:
@@ -71,4 +71,4 @@ class QueueManager:
         return message, item
 
     def delete(self, message) -> None:
-        self.queue.delete_message(ReceiptHandle=message["ReceiptHandle"])
+        self.queue.delete_message(ReceiptHandle=message.receipt_handle)
