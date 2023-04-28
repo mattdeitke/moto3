@@ -17,9 +17,9 @@ s3_resource = boto3.resource("s3")
 class S3Manager:
     def __init__(self, bucket_name: str):
         self.bucket_name = bucket_name
-        self.create_bucket(bucket_name)
+        self._create_bucket(bucket_name)
 
-    def create_bucket(self, bucket_name: str) -> None:
+    def _create_bucket(self, bucket_name: str) -> None:
         try:
             s3_resource.meta.client.head_bucket(Bucket=bucket_name)
             print(f"Bucket '{bucket_name}' found.")
