@@ -10,6 +10,7 @@ formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(messag
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
+region_name = "us-west-2"
 s3_client = boto3.client("s3")
 s3_resource = boto3.resource("s3")
 
@@ -22,14 +23,22 @@ class S3Manager:
     def _create_bucket(self, bucket_name: str) -> None:
         try:
             s3_resource.meta.client.head_bucket(Bucket=bucket_name)
-            print(f"Bucket '{bucket_name}' found.")
-        except s3_client.exceptions.NoSuchBucket:
-            print(f"Bucket '{bucket_name}' not found. Creating a new bucket.")
-            s3_client.create_bucket(Bucket=bucket_name)
-            print(f"Bucket '{bucket_name}' created successfully.")
+            logger.info(f"Bucket '{bucket_name}' found.")
+        except s3_client.exceptions.ClientError:
+            logger.info(f"Bucket '{bucket_name}' not found. Creating a new bucket.")
+            s3_client.create_bucket(
+                Bucket=bucket_name,
+                CreateBucketConfiguration={"LocationConstraint": region_name},
+            )
+            logger.info(f"Bucket '{bucket_name}' created successfully.")
+        except s3_client.exceptions.BucketAlreadyOwnedByYou:
+            logger.info(f"Bucket '{bucket_name}' found.")
 
     def upload(self, obj: str, key: str) -> None:
         s3_client.put_object(Bucket=self.bucket_name, Key=key, Body=obj)
+
+    def delete(self, key: str) -> None:
+        s3_client.delete_object(Bucket=self.bucket_name, Key=key)
 
     def upload_file(self, file_path: str, key: str) -> None:
         s3_client.upload_file(file_path, self.bucket_name, key)
