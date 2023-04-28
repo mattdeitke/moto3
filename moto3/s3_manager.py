@@ -28,6 +28,9 @@ class S3Manager:
             s3_client.create_bucket(Bucket=bucket_name)
             print(f"Bucket '{bucket_name}' created successfully.")
 
+    def upload(self, obj: str, key: str) -> None:
+        s3_client.put_object(Bucket=self.bucket_name, Key=key, Body=obj)
+
     def upload_file(self, file_path: str, key: str) -> None:
         s3_client.upload_file(file_path, self.bucket_name, key)
 
