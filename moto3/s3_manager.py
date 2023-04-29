@@ -51,6 +51,6 @@ class S3Manager:
         results = s3_client.list_objects(Bucket=self.bucket_name, Prefix=key)
         return "Contents" in results
 
-    def list_all_files(bucket_name: str) -> list:
-        bucket = s3_resource.Bucket(bucket_name)
+    def list_all_files(self) -> list:
+        bucket = s3_resource.Bucket(self.bucket_name)
         return [obj.key for obj in bucket.objects.all()]
