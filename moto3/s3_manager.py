@@ -1,4 +1,5 @@
 import boto3
+from tqdm import tqdm
 import logging
 
 # Configure the logger
@@ -53,4 +54,4 @@ class S3Manager:
 
     def list_all_files(self) -> list:
         bucket = s3_resource.Bucket(self.bucket_name)
-        return [obj.key for obj in bucket.objects.all()]
+        return [obj.key for obj in tqdm(bucket.objects.all())]
