@@ -60,6 +60,12 @@ class S3Manager:
         results = s3_client.list_objects(Bucket=self.bucket_name, Prefix=key)
         return "Contents" in results
 
-    def list_all_files(self) -> list:
+    def list_all_files(self, max_files: int = None) -> list:
         bucket = s3_resource.Bucket(self.bucket_name)
-        return [obj.key for obj in tqdm(bucket.objects.all())]
+        return (
+            [obj.key for obj in tqdm(bucket.objects.all())]
+            if max_files is None
+            else [
+                obj.key for _, obj in tqdm(zip(range(max_files), bucket.objects.all()))
+            ]
+        )
