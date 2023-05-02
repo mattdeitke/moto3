@@ -35,6 +35,14 @@ class S3Manager:
         except s3_client.exceptions.BucketAlreadyOwnedByYou:
             logger.info(f"Bucket '{bucket_name}' found.")
 
+    @staticmethod
+    def list_buckets() -> list:
+        response = s3_client.list_buckets()
+        sorted_buckets = sorted(
+            response["Buckets"], key=lambda bucket: bucket["CreationDate"], reverse=True
+        )
+        return [bucket["Name"] for bucket in sorted_buckets]
+
     def upload(self, obj: str, key: str) -> None:
         s3_client.put_object(Bucket=self.bucket_name, Key=key, Body=obj)
 
