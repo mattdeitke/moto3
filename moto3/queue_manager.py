@@ -58,9 +58,14 @@ class QueueManager:
             (messages[i : i + batch_size], self.queue_url)
             for i in range(0, len(messages), batch_size)
         ]
-        # use tqdm and multiprocessing to upload the batches
-        with Pool(multiprocessing.cpu_count()) as p:
-            list(tqdm(p.imap(_upload_batch, batches), total=len(batches)))
+        if len(batches) < multiprocessing.cpu_count():
+            logger.info("Uploading batches sequentially.")
+            for batch in tqdm(batches):
+                _upload_batch(batch)
+        else:
+            # use tqdm and multiprocessing to upload the batches
+            with Pool(multiprocessing.cpu_count()) as p:
+                list(tqdm(p.imap(_upload_batch, batches), total=len(batches)))
 
     def get_next(self, max_messages: int = 1) -> list:
         queue = sqs_resource.Queue(self.queue_url)
