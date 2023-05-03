@@ -1,8 +1,11 @@
 import boto3
+import time
+import botocore
 import json
 from multiprocessing import Pool
 import logging
 from tqdm import tqdm
+from typing import Any
 import multiprocessing
 
 # Configure the logger
@@ -21,6 +24,19 @@ sqs_resource = boto3.resource("sqs")
 def _upload_batch(args):
     batch, queue_url = args
     sqs_client.send_message_batch(QueueUrl=queue_url, Entries=batch)
+
+
+def _upload_batch_with_retry(args: tuple) -> Any:
+    batch, max_retries, sleep_time = args
+    for retry in range(max_retries):
+        try:
+            _upload_batch(batch)
+            return None  # If successful, return None
+        except botocore.parsers.ResponseParserError as e:
+            if retry < max_retries - 1:  # If not the last retry, sleep and retry
+                time.sleep(sleep_time)
+            else:  # If last retry, return the exception
+                return e
 
 
 class QueueManager:
@@ -43,7 +59,7 @@ class QueueManager:
         queue = sqs_resource.Queue(self.queue_url)
         return int(queue.attributes["ApproximateNumberOfMessages"])
 
-    def upload(self, messages: list) -> None:
+    def upload(self, messages: list, max_retries: int = 3, sleep_time: int = 5) -> None:
         messages = [
             {
                 "Id": f"{i}",
@@ -61,11 +77,31 @@ class QueueManager:
         if len(batches) < multiprocessing.cpu_count():
             logger.info("Uploading batches sequentially.")
             for batch in tqdm(batches):
-                _upload_batch(batch)
+                for retry in range(max_retries):
+                    try:
+                        _upload_batch(batch)
+                        break  # If successful, break the retry loop
+                    except botocore.parsers.ResponseParserError as e:
+                        if (
+                            retry < max_retries - 1
+                        ):  # If not the last retry, sleep and retry
+                            time.sleep(sleep_time)
+                        else:  # If last retry, raise the exception
+                            raise e
         else:
             # use tqdm and multiprocessing to upload the batches
             with Pool(multiprocessing.cpu_count()) as p:
-                list(tqdm(p.imap(_upload_batch, batches), total=len(batches)))
+                for result in tqdm(
+                    p.imap(
+                        _upload_batch_with_retry,
+                        [(batch, max_retries, sleep_time) for batch in batches],
+                    ),
+                    total=len(batches),
+                ):
+                    if isinstance(
+                        result, Exception
+                    ):  # If an exception occurred in any worker, raise it
+                        raise result
 
     def get_next(self, max_messages: int = 1) -> list:
         queue = sqs_resource.Queue(self.queue_url)
