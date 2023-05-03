@@ -1,6 +1,7 @@
 import boto3
 from tqdm import tqdm
 from datetime import datetime, timedelta
+from typing import Optional
 import logging
 
 # Configure the logger
@@ -61,15 +62,14 @@ class S3Manager:
         results = s3_client.list_objects(Bucket=self.bucket_name, Prefix=key)
         return "Contents" in results
 
-    def list_all_files(self, max_files: int = None) -> list:
+    def list_all_files(self, prefix: str = "", max_files: Optional[int] = None) -> list:
         bucket = s3_resource.Bucket(self.bucket_name)
-        return (
-            [obj.key for obj in tqdm(bucket.objects.all())]
-            if max_files is None
-            else [
-                obj.key for _, obj in tqdm(zip(range(max_files), bucket.objects.all()))
-            ]
-        )
+        filtered_objects = bucket.objects.filter(Prefix=prefix)
+
+        if max_files is None:
+            return [obj.key for obj in tqdm(filtered_objects)]
+        else:
+            return [obj.key for _, obj in tqdm(zip(range(max_files), filtered_objects))]
 
     def get_file_count(self, days_ago: int = 5):
         cloudwatch = boto3.client("cloudwatch")
