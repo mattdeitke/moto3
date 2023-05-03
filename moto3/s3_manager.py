@@ -1,5 +1,6 @@
 import boto3
 from tqdm import tqdm
+from datetime import datetime, timedelta
 import logging
 
 # Configure the logger
@@ -69,3 +70,37 @@ class S3Manager:
                 obj.key for _, obj in tqdm(zip(range(max_files), bucket.objects.all()))
             ]
         )
+
+    def get_file_count(self, days_ago: int = 5):
+        cloudwatch = boto3.client("cloudwatch")
+        daily_counts = []
+
+        for i in range(days_ago, 0, -1):
+            start_time = datetime.now() - timedelta(days=i)
+            end_time = start_time + timedelta(days=1)
+            response = cloudwatch.get_metric_statistics(
+                Namespace="AWS/S3",
+                MetricName="NumberOfObjects",
+                Dimensions=[
+                    {"Name": "BucketName", "Value": self.bucket_name},
+                    {"Name": "StorageType", "Value": "AllStorageTypes"},
+                ],
+                StartTime=start_time,
+                EndTime=end_time,
+                Period=86400,  # 24 hours in seconds
+                Statistics=["Average"],
+            )
+
+            if response["Datapoints"]:
+                total_objects = response["Datapoints"][0]["Average"]
+                daily_counts.append((start_time.date(), total_objects))
+
+        # Sort the list by date in descending order (latest counts first)
+        daily_counts.sort(key=lambda x: x[0], reverse=True)
+
+        # Format the list with dates as "MM-DD-YYYY"
+        formatted_daily_counts = [
+            (date.strftime("%m-%d-%Y"), int(count)) for date, count in daily_counts
+        ]
+
+        return formatted_daily_counts
