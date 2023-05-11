@@ -103,9 +103,12 @@ class QueueManager:
                     ):  # If an exception occurred in any worker, raise it
                         raise result
 
-    def get_next(self, max_messages: int = 1) -> list:
+    def get_next(self, max_messages: int = 1, visibility_timeout: int = 30) -> list:
         queue = sqs_resource.Queue(self.queue_url)
-        response = queue.receive_messages(MaxNumberOfMessages=max_messages)
+        response = queue.receive_messages(
+            MaxNumberOfMessages=max_messages,
+            VisibilityTimeout=visibility_timeout
+        )
         message = response[0]
         if message.body.startswith("{"):
             item = json.loads(message.body)
