@@ -1,12 +1,13 @@
-import boto3
-import time
-import botocore
 import json
-from multiprocessing import Pool
 import logging
-from tqdm import tqdm
-from typing import Any
 import multiprocessing
+import time
+from multiprocessing import Pool
+from typing import Any, Optional
+
+import boto3
+import botocore
+from tqdm import tqdm
 
 # Configure the logger
 logger = logging.getLogger(__name__)
@@ -106,8 +107,7 @@ class QueueManager:
     def get_next(self, max_messages: int = 1, visibility_timeout: int = 30) -> list:
         queue = sqs_resource.Queue(self.queue_url)
         response = queue.receive_messages(
-            MaxNumberOfMessages=max_messages,
-            VisibilityTimeout=visibility_timeout
+            MaxNumberOfMessages=max_messages, VisibilityTimeout=visibility_timeout
         )
         message = response[0]
         if message.body.startswith("{"):
@@ -123,3 +123,44 @@ class QueueManager:
 
     def purge(self) -> None:
         sqs_client.purge_queue(QueueUrl=self.queue_url)
+
+
+class LocalQueueManager:
+    def __init__(self, local_file: str) -> None:
+        if not local_file.endswith(".json"):
+            raise ValueError("Local file must be a JSON file.")
+        self.local_file = local_file
+        with open(local_file, "r") as f:
+            self.messages = json.load(f)
+        self.current_index = 0
+
+    @property
+    def size(self) -> int:
+        return len(self.messages)
+
+    def upload(self, messages: list) -> None:
+        self.messages.extend(messages)
+
+    def get_next(
+        self, max_messages: int = 1, visibility_timeout: Optional[int] = None
+    ) -> list:
+        if visibility_timeout is not None:
+            # log a warning if visibility_timeout is not None
+            logger.warning(
+                "Visibility timeout is not supported for local queues. "
+                "This argument will be ignored."
+            )
+        out = self.messages[self.current_index : self.current_index + max_messages]
+        self.current_index += max_messages
+        return out
+
+    def delete(self, message) -> None:
+        logger.warning(
+            "delete is not supported for local queues. "
+            "This argument will be ignored."
+        )
+
+    def purge(self) -> None:
+        logger.warning(
+            "purge is not supported for local queues. " "This argument will be ignored."
+        )
