@@ -143,13 +143,17 @@ class LocalQueueManager:
 
     def get_next(
         self, max_messages: int = 1, visibility_timeout: Optional[int] = None
-    ) -> list:
+    ) -> Any:
         if visibility_timeout is not None:
             # log a warning if visibility_timeout is not None
             logger.warning(
                 "Visibility timeout is not supported for local queues. "
                 "This argument will be ignored."
             )
+        if max_messages == 1:
+            out = self.messages[self.current_index]
+            self.current_index += 1
+            return out
         out = self.messages[self.current_index : self.current_index + max_messages]
         self.current_index += max_messages
         return out
