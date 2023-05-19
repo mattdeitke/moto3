@@ -153,7 +153,7 @@ class LocalQueueManager:
         if max_messages == 1:
             out = self.messages[self.current_index]
             self.current_index += 1
-            return out
+            return None, out
         out = self.messages[self.current_index : self.current_index + max_messages]
         self.current_index += max_messages
         return None, out
