@@ -3,7 +3,7 @@ import logging
 import multiprocessing
 import time
 from multiprocessing import Pool
-from typing import Any, Optional
+from typing import Any, Optional, Tuple
 
 import boto3
 import botocore
@@ -143,7 +143,7 @@ class LocalQueueManager:
 
     def get_next(
         self, max_messages: int = 1, visibility_timeout: Optional[int] = None
-    ) -> Any:
+    ) -> Tuple[None, Any]:
         if visibility_timeout is not None:
             # log a warning if visibility_timeout is not None
             logger.warning(
@@ -156,7 +156,7 @@ class LocalQueueManager:
             return out
         out = self.messages[self.current_index : self.current_index + max_messages]
         self.current_index += max_messages
-        return out
+        return None, out
 
     def delete(self, message) -> None:
         logger.warning(
