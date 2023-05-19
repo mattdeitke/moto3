@@ -1,8 +1,11 @@
-import boto3
-from tqdm import tqdm
+import logging
+import os
+import shutil
 from datetime import datetime, timedelta
 from typing import Optional
-import logging
+
+import boto3
+from tqdm import tqdm
 
 # Configure the logger
 logger = logging.getLogger(__name__)
@@ -104,3 +107,57 @@ class S3Manager:
         ]
 
         return formatted_daily_counts
+
+
+class LocalStorageManager:
+    def __init__(self, root_dir: str):
+        self.root_dir = root_dir
+
+    @staticmethod
+    def list_buckets() -> list:
+        raise Exception("LocalStorageManager does not support list_buckets()")
+
+    def upload(self, obj: str, key: str) -> None:
+        # make the key directory
+        obj_dir = os.path.join(self.root_dir, os.path.dirname(key))
+        os.makedirs(obj_dir, exist_ok=True)
+
+        # write the object to the key
+        obj_path = os.path.join(self.root_dir, key)
+        with open(obj_path, "w") as f:
+            f.write(obj)
+
+    def delete(self, key: str) -> None:
+        obj_path = os.path.join(self.root_dir, key)
+        os.remove(obj_path)
+
+    def upload_file(self, file_path: str, key: str) -> None:
+        # make the key directory
+        obj_dir = os.path.join(self.root_dir, os.path.dirname(key))
+        os.makedirs(obj_dir, exist_ok=True)
+
+        # copy the file to the key
+        obj_path = os.path.join(self.root_dir, key)
+        shutil.copy(file_path, obj_path)
+
+    def read_file(self, key: str) -> str:
+        obj_path = os.path.join(self.root_dir, key)
+        with open(obj_path, "r") as f:
+            return f.read()
+
+    def exists(self, key: str) -> bool:
+        obj_path = os.path.join(self.root_dir, key)
+        return os.path.exists(obj_path)
+
+    def list_all_files(self, prefix: str = "", max_files: Optional[int] = None) -> list:
+        dir_to_search = os.path.join(self.root_dir, prefix)
+        file_list = []
+        for root, dirs, files in os.walk(dir_to_search):
+            for file in files:
+                file_list.append(os.path.join(root, file))
+                if max_files is not None and len(file_list) >= max_files:
+                    return file_list
+        return file_list
+
+    def get_file_count(self, days_ago: int = 5):
+        return len(self.list_all_files())
