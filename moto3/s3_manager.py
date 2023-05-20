@@ -57,9 +57,16 @@ class S3Manager:
     def upload_file(self, file_path: str, key: str) -> None:
         s3_client.upload_file(file_path, self.bucket_name, key)
 
-    def read_file(self, key: str) -> str:
+    def read_file(self, key: str, decode: Optional[str] = "utf-8") -> str:
         obj = s3_resource.Object(self.bucket_name, key)
-        return obj.get()["Body"].read().decode("utf-8")
+        obj = obj.get()["Body"].read()
+        if decode == "utf-8":
+            obj = obj.decode("utf-8")
+        elif decode is None:
+            pass
+        else:
+            raise ValueError(f"Unsupported decode type: {decode}")
+        return obj
 
     def exists(self, key: str) -> bool:
         results = s3_client.list_objects(Bucket=self.bucket_name, Prefix=key)
