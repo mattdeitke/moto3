@@ -65,14 +65,23 @@ class S3Manager:
         results = s3_client.list_objects(Bucket=self.bucket_name, Prefix=key)
         return "Contents" in results
 
-    def list_all_files(self, prefix: str = "", max_files: Optional[int] = None) -> list:
+    def list_all_files(
+        self,
+        prefix: str = "",
+        max_files: Optional[int] = None,
+        show_progress: bool = True,
+    ) -> list:
         bucket = s3_resource.Bucket(self.bucket_name)
         filtered_objects = bucket.objects.filter(Prefix=prefix)
 
         if max_files is None:
-            return [obj.key for obj in tqdm(filtered_objects)]
+            out_iter = tqdm(filtered_objects) if show_progress else filtered_objects
+            return [obj.key for obj in out_iter]
         else:
-            return [obj.key for _, obj in tqdm(zip(range(max_files), filtered_objects))]
+            out_iter = zip(range(max_files), filtered_objects)
+            if show_progress:
+                out_iter = tqdm(out_iter, total=max_files)
+            return [obj.key for _, obj in out_iter]
 
     def get_file_count(self, days_ago: int = 5):
         cloudwatch = boto3.client("cloudwatch")
@@ -149,7 +158,12 @@ class LocalStorageManager:
         obj_path = os.path.join(self.root_dir, key)
         return os.path.exists(obj_path)
 
-    def list_all_files(self, prefix: str = "", max_files: Optional[int] = None) -> list:
+    def list_all_files(
+        self,
+        prefix: str = "",
+        max_files: Optional[int] = None,
+        show_progress: bool = True,
+    ) -> list:
         dir_to_search = os.path.join(self.root_dir, prefix)
         file_list = []
         for root, dirs, files in os.walk(dir_to_search):
