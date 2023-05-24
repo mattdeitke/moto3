@@ -77,9 +77,21 @@ class S3Manager:
         prefix: str = "",
         max_files: Optional[int] = None,
         show_progress: bool = True,
+        last_modified_hours: Optional[int] = None,
     ) -> list:
         bucket = s3_resource.Bucket(self.bucket_name)
         filtered_objects = bucket.objects.filter(Prefix=prefix)
+
+        if last_modified_hours is not None:
+            first_obj_tz = next(iter(filtered_objects)).last_modified.tzinfo
+            min_last_modified_date = datetime.now(first_obj_tz) - timedelta(
+                hours=last_modified_hours
+            )
+            filtered_objects = [
+                obj
+                for obj in filtered_objects
+                if obj.last_modified > min_last_modified_date
+            ]
 
         if max_files is None:
             out_iter = tqdm(filtered_objects) if show_progress else filtered_objects
