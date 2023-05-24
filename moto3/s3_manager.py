@@ -72,6 +72,9 @@ class S3Manager:
         results = s3_client.list_objects(Bucket=self.bucket_name, Prefix=key)
         return "Contents" in results
 
+    def download_file(self, key: str, file_path: str) -> None:
+        s3_client.download_file(self.bucket_name, key, file_path)
+
     def list_all_files(
         self,
         prefix: str = "",
