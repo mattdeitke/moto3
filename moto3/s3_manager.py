@@ -90,6 +90,9 @@ class S3Manager:
     def download_file(self, key: str, file_path: str) -> None:
         s3_client.download_file(self.bucket_name, key, file_path)
 
+    @retry(
+        stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=4, max=10)
+    )
     def list_all_files(
         self,
         prefix: str = "",
