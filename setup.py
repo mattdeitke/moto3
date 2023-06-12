@@ -7,6 +7,8 @@ setup(
     install_requires=[
         "boto3",
         "tqdm",
+        "tenacity",
+        "botocore"
     ],
     author="Matt Deitke",
     author_email="mattd@allenai.org",
