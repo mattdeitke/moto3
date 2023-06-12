@@ -3,6 +3,8 @@ import os
 import shutil
 from datetime import datetime, timedelta
 from typing import Optional
+from tenacity import retry, stop_after_attempt, wait_exponential
+from botocore.exceptions import ClientError
 
 import boto3
 from tqdm import tqdm
@@ -50,6 +52,19 @@ class S3Manager:
 
     def upload(self, obj: str, key: str) -> None:
         s3_client.put_object(Bucket=self.bucket_name, Key=key, Body=obj)
+
+    @retry(
+        stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=4, max=10)
+    )
+    def upload(self, obj: str, key: str) -> None:
+        try:
+            s3_client.put_object(Bucket=self.bucket_name, Key=key, Body=obj)
+        except ClientError as e:
+            if e.response["Error"]["Code"] == "SlowDown":
+                print("Exceeded request rate. Retrying...")
+                raise
+            else:
+                raise  # re-throw the last exception if SlowDown was not the cause
 
     def delete(self, key: str) -> None:
         s3_client.delete_object(Bucket=self.bucket_name, Key=key)
