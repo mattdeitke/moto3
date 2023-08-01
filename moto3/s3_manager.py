@@ -25,10 +25,27 @@ s3_resource = boto3.resource("s3")
 
 class S3Manager:
     def __init__(self, bucket_name: str):
-        self.bucket_name = bucket_name
-        self._create_bucket(bucket_name)
+        """Create a new S3Manager instance.
 
-    def _create_bucket(self, bucket_name: str) -> None:
+        If the bucket does not exist, it will be created.
+
+        Args:
+            bucket_name (str): The name of the bucket to use, which may
+                include a directory path (e.g. "my-bucket/my-dir").
+                In such a case, only my-bucket will be created and
+                my-dir will be used as the directory path for all
+                operations.
+        """
+        if "/" in bucket_name:
+            self.bucket_name = bucket_name.split("/")[0]
+            self.dirpath = bucket_name[len(bucket_name) + 1 :]
+        else:
+            self.bucket_name = bucket_name
+            self.dirpath = ""
+        S3Manager.create_bucket(self.bucket_name)
+
+    @staticmethod
+    def create_bucket(bucket_name: str) -> None:
         try:
             s3_resource.meta.client.head_bucket(Bucket=bucket_name)
             logger.info(f"Bucket '{bucket_name}' found.")
@@ -50,15 +67,13 @@ class S3Manager:
         )
         return [bucket["Name"] for bucket in sorted_buckets]
 
-    def upload(self, obj: str, key: str) -> None:
-        s3_client.put_object(Bucket=self.bucket_name, Key=key, Body=obj)
-
     @retry(
         stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=4, max=10)
     )
     def upload(self, obj: str, key: str) -> None:
+        file_path = os.path.join(self.dirpath, key)
         try:
-            s3_client.put_object(Bucket=self.bucket_name, Key=key, Body=obj)
+            s3_client.put_object(Bucket=self.bucket_name, Key=file_path, Body=obj)
         except ClientError as e:
             if e.response["Error"]["Code"] == "SlowDown":
                 print("Exceeded request rate. Retrying...")
@@ -67,13 +82,31 @@ class S3Manager:
                 raise  # re-throw the last exception if SlowDown was not the cause
 
     def delete(self, key: str) -> None:
-        s3_client.delete_object(Bucket=self.bucket_name, Key=key)
+        file_path = os.path.join(self.dirpath, key)
+        s3_client.delete_object(Bucket=self.bucket_name, Key=file_path)
 
     def upload_file(self, file_path: str, key: str) -> None:
-        s3_client.upload_file(file_path, self.bucket_name, key)
+        """Upload a file to S3.
+
+        Args:
+            file_path (str): The path to the file to upload.
+            key (str): The key to use for the file in S3.
+        """
+        upload_path = os.path.join(self.dirpath, key)
+        s3_client.upload_file(file_path, self.bucket_name, upload_path)
 
     def read_file(self, key: str, decode: Optional[str] = "utf-8") -> str:
-        obj = s3_resource.Object(self.bucket_name, key)
+        """Read a file from S3.
+
+        Args:
+            key (str): The key to use for the file in S3.
+            decode (str, optional): The type of decoding to use. Defaults to "utf-8".
+
+        Returns:
+            str: The contents of the file.
+        """
+        s3_file_path = os.path.join(self.dirpath, key)
+        obj = s3_resource.Object(self.bucket_name, s3_file_path)
         obj = obj.get()["Body"].read()
         if decode == "utf-8":
             obj = obj.decode("utf-8")
@@ -84,11 +117,21 @@ class S3Manager:
         return obj
 
     def exists(self, key: str) -> bool:
-        results = s3_client.list_objects(Bucket=self.bucket_name, Prefix=key)
+        """Check if a file exists in S3.
+
+        Args:
+            key (str): The key to use for the file in S3.
+
+        Returns:
+            bool: True if the file exists, False otherwise.
+        """
+        s3_file_path = os.path.join(self.dirpath, key)
+        results = s3_client.list_objects(Bucket=self.bucket_name, Prefix=s3_file_path)
         return "Contents" in results
 
     def download_file(self, key: str, file_path: str) -> None:
-        s3_client.download_file(self.bucket_name, key, file_path)
+        s3_file_path = os.path.join(self.dirpath, key)
+        s3_client.download_file(self.bucket_name, s3_file_path, file_path)
 
     @retry(
         stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=4, max=10)
@@ -101,7 +144,8 @@ class S3Manager:
         last_modified_hours: Optional[int] = None,
     ) -> list:
         bucket = s3_resource.Bucket(self.bucket_name)
-        filtered_objects = bucket.objects.filter(Prefix=prefix)
+        prefix_path = os.path.join(self.dirpath, prefix)
+        filtered_objects = bucket.objects.filter(Prefix=prefix_path)
 
         if last_modified_hours is not None:
             first_obj_tz = next(iter(filtered_objects)).last_modified.tzinfo
@@ -124,6 +168,11 @@ class S3Manager:
             return [obj.key for _, obj in out_iter]
 
     def get_file_count(self, days_ago: int = 5):
+        """Get the number of files in the bucket for each day in the past.
+
+        Warning - this method will ignore the directory path if one was
+        specified when creating the S3Manager instance.
+        """
         cloudwatch = boto3.client("cloudwatch")
         daily_counts = []
 
