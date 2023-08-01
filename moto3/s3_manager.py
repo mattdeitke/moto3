@@ -160,12 +160,17 @@ class S3Manager:
 
         if max_files is None:
             out_iter = tqdm(filtered_objects) if show_progress else filtered_objects
-            return [obj.key for obj in out_iter]
+            file_keys = [obj.key for obj in out_iter]
         else:
             out_iter = zip(range(max_files), filtered_objects)
             if show_progress:
                 out_iter = tqdm(out_iter, total=max_files)
-            return [obj.key for _, obj in out_iter]
+            file_keys = [obj.key for _, obj in out_iter]
+
+        if self.dirpath:
+            file_keys = [key[len(self.dirpath) + 1 :] for key in file_keys]
+
+        return file_keys
 
     def get_file_count(self, days_ago: int = 5):
         """Get the number of files in the bucket for each day in the past.
