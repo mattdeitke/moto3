@@ -38,7 +38,7 @@ class S3Manager:
         """
         if "/" in bucket_name:
             self.bucket_name = bucket_name.split("/")[0]
-            self.dirpath = bucket_name[len(bucket_name) + 1 :]
+            self.dirpath = bucket_name[len(self.bucket_name) + 1 :]
         else:
             self.bucket_name = bucket_name
             self.dirpath = ""
