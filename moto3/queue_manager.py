@@ -7,6 +7,7 @@ from typing import Any, Optional, Tuple
 
 import boto3
 import botocore
+from botocore.exceptions import ClientError
 from tqdm import tqdm
 
 # Configure the logger
@@ -53,6 +54,11 @@ class QueueManager:
             logger.warning(f"Queue '{queue_name}' not found. Creating a new queue.")
             queue = sqs_resource.create_queue(QueueName=queue_name)
             logger.info(f"Queue '{queue_name}' created successfully.")
+        except ClientError as e:
+            if "NonExistentQueue" in str(e):
+                logger.warning(f"Queue '{queue_name}' not found. Creating a new queue.")
+                queue = sqs_resource.create_queue(QueueName=queue_name)
+                logger.info(f"Queue '{queue_name}' created successfully.")
         return queue.url
 
     @property
